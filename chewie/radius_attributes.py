@@ -116,6 +116,14 @@ class State(Attribute):
 
 
 @register_attribute_type
+class Class(Attribute):
+    """Class https://tools.ietf.org/html/rfc2865#section-5.25"""
+    TYPE = 25
+    DATA_TYPE = String
+    DESCRIPTION = "Class"
+
+
+@register_attribute_type
 class VendorSpecific(Attribute):
     """Vendor-Specific https://tools.ietf.org/html/rfc2865#section-5.26"""
     TYPE = 26
