@@ -20,6 +20,7 @@ class Eap:
     MD5_CHALLENGE = 4
     TLS = 13
     TTLS = 21
+    PEAP = 25
 
     code = None
     packet_id = None
@@ -203,3 +204,8 @@ class EapTLS(EapTLSBase):
 @register_parser
 class EapTTLS(EapTLSBase):
     PACKET_TYPE = 21
+
+
+@register_parser
+class EapPEAP(EapTLSBase):
+    PACKET_TYPE = 25

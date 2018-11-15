@@ -7,7 +7,7 @@ from chewie.radius_attributes import CallingStationId, UserName, MessageAuthenti
 from chewie.ethernet_packet import EthernetPacket
 from chewie.auth_8021x import Auth8021x
 from chewie.eap import Eap, EapIdentity, EapMd5Challenge, EapSuccess, EapFailure, EapLegacyNak, \
-    EapTTLS, EapTLS, PARSERS_TYPES
+    EapTTLS, EapTLS, EapPEAP, PARSERS_TYPES
 
 
 class EapMessage:
@@ -80,6 +80,10 @@ class TlsMessageBase(EapMessage):
         return cls(src_mac, eap.packet_id, eap.code, eap.flags, eap.extra_data)
 
 
+class PeapMessage(TlsMessageBase):
+    pass
+
+
 class TlsMessage(TlsMessageBase):
     pass
 
@@ -112,6 +116,7 @@ EAP_MESSAGES = {
     Eap.LEGACY_NAK: LegacyNakMessage,
     Eap.TLS: TlsMessage,
     Eap.TTLS: TtlsMessage,
+    Eap.PEAP: PeapMessage,
 }
 
 
@@ -247,6 +252,11 @@ class MessagePacker:
         elif isinstance(message, Md5ChallengeMessage):
             eap = EapMd5Challenge(message.code, message.message_id,
                                   message.challenge, message.extra_data)
+            version = 1
+            packet_type = 0
+            data = eap.pack()
+        elif isinstance(message, PeapMessage):
+            eap = EapPEAP(message.code, message.message_id, message.flags, message.extra_data)
             version = 1
             packet_type = 0
             data = eap.pack()
