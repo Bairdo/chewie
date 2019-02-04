@@ -210,8 +210,7 @@ class MessagePacker:
         return ethernet_packet.pack()
 
     @staticmethod
-    def radius_pack(eap_message, src_mac, username, radius_packet_id,
-                    request_authenticator, state, secret, nas_port=None, extra_attributes=None):
+    def radius_pack(radius_packet_id, request_authenticator, secret, attributes=None):
         """
         Packs up a RADIUS message to send to a RADIUS Server.
         Args:
@@ -222,33 +221,16 @@ class MessagePacker:
             request_authenticator (bytes):
             state (State): RADIUS State
             secret (str): RADIUS secret used between Chewie and RADIUS Server
-            extra_attributes (list): list of extra RADIUS attributes to send along with the above.
+            attributes (list): list of RADIUS attributes to send along with the above.
 
         Returns:
             packed RADIUS packet (bytes)
         """
-        if not extra_attributes:
-            extra_attributes = []
 
-        attr_list = []
-        attr_list.append(UserName.create(username))
-        attr_list.append(CallingStationId.create(str(src_mac)))
+        attr_list = RadiusAttributesList(attributes)
+        access_request = RadiusAccessRequest(radius_packet_id, request_authenticator,
+                                             attr_list)
 
-        if nas_port:
-            attr_list.append(NASPort.create(nas_port))
-
-        attr_list.extend(extra_attributes)
-
-        attr_list.append(EAPMessage.create(eap_message))
-
-        if state:
-            attr_list.append(state)
-
-        attr_list.append(MessageAuthenticator.create(
-            bytes.fromhex("00000000000000000000000000000000")))
-
-        attributes = RadiusAttributesList(attr_list)
-        access_request = RadiusAccessRequest(radius_packet_id, request_authenticator, attributes)
         return access_request.build(secret)
 
     @staticmethod

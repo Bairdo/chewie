@@ -4,7 +4,8 @@ import os
 import struct
 
 from chewie.message_parser import MessagePacker
-from chewie.radius_attributes import EAPMessage, State, CalledStationId, NASIdentifier, NASPortType
+from chewie.radius_attributes import EAPMessage, State, CalledStationId, NASIdentifier,\
+    NASPortType, UserName, CallingStationId, NASPort, MessageAuthenticator
 from chewie.event import EventRadiusMessageReceived
 
 
@@ -16,6 +17,7 @@ def port_id_to_int(port_id):
 
 
 class RadiusLifecycle:
+
     """A placeholder object for RADIUS logic extracted from Chewie"""
     def __init__(self, radius_secret, server_id, logger):
         self.radius_secret = radius_secret
@@ -38,21 +40,16 @@ class RadiusLifecycle:
 
         self.logger.info("got eap to send to radius.. mac: %s %s, username: %s",
                          type(src_mac), src_mac, username)
-        state_dict = None
-        if state:
-            state_dict = state.__dict__
-        self.logger.info("Sending to RADIUS eap message %s with state %s",
-                         eap_message.__dict__, state_dict)
+
         radius_packet_id = self.get_next_radius_packet_id()
         self.packet_id_to_mac[radius_packet_id] = {'src_mac': src_mac, 'port_id': port_id}
         # message is eap. needs to be wrapped into a radius packet.
         request_authenticator = self.generate_request_authenticator()
         self.packet_id_to_request_authenticator[radius_packet_id] = request_authenticator
-        return MessagePacker.radius_pack(eap_message, src_mac, username,
-                                         radius_packet_id, request_authenticator, state,
+        attr_list = self.prepare_attributes(eap_message, port_id, src_mac, state, username)
+        return MessagePacker.radius_pack(radius_packet_id, request_authenticator,
                                          self.radius_secret,
-                                         port_id_to_int(port_id),
-                                         self.extra_radius_request_attributes)
+                                         attr_list)
 
     def build_event_radius_message_received(self, radius):
         """Build a EventRadiusMessageReceived from a radius message"""
@@ -81,4 +78,18 @@ class RadiusLifecycle:
         attr_list = [CalledStationId.create(self.server_id),
                      NASPortType.create(15),
                      NASIdentifier.create(self.server_id)]
+        return attr_list
+
+    def prepare_attributes(self, eap_message, port_id, src_mac, state, username):
+        attr_list = [UserName.create(username),
+                     CallingStationId.create(str(src_mac)),
+                     NASPort.create(port_id_to_int(port_id)),
+                     EAPMessage.create(eap_message)]
+        if state:
+            attr_list.append(state)
+        attr_list.append(MessageAuthenticator.create(
+            bytes.fromhex("00000000000000000000000000000000")))
+
+        attr_list.extend(self.extra_radius_request_attributes)
+
         return attr_list

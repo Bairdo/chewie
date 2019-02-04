@@ -3,13 +3,13 @@
 import struct
 import unittest
 from chewie.message_parser import MessageParser, MessagePacker, IdentityMessage, \
-    Md5ChallengeMessage, TtlsMessage, \
-    LegacyNakMessage, TlsMessage, PeapMessage
+    Md5ChallengeMessage, TtlsMessage, LegacyNakMessage, TlsMessage, PeapMessage, EAPMessage
 from chewie.message_parser import EapolStartMessage, EapolLogoffMessage,\
     SuccessMessage, FailureMessage
 from chewie.mac_address import MacAddress
 from chewie.eap import Eap
-from chewie.radius_attributes import State, CalledStationId, NASPortType
+from chewie.radius_attributes import State, CalledStationId, NASPortType, CallingStationId, \
+    UserName, MessageAuthenticator, NASPort
 from chewie.utils import MessageParseError
 
 
@@ -252,39 +252,43 @@ class MessageParserTestCase(unittest.TestCase):
                                        "1812f51d90b0f76c85835ed4ac882e522748501201531ea8051d136941fece17473f6b4a")  # pylint: disable=line-too-long
 
         src_mac = MacAddress.from_string("02:42:ac:17:00:6f")
-        username = "user"
         radius_packet_id = 10
         request_authenticator = bytes.fromhex("be5df1f3b3366c69b977e56a7da47cba")
-        state = State.create(bytes.fromhex("f51d90b0f76c85835ed4ac882e522748"))
         secret = "SECRET"
-        extra_attributes = []
-        extra_attributes.append(CalledStationId.create('44-44-44-44-44-44:'))
-        extra_attributes.append(NASPortType.create(15))
+        attributes = [UserName.create("user"),
+                      CallingStationId.create(str(src_mac)),
+                      CalledStationId.create('44-44-44-44-44-44:'),
+                      NASPortType.create(15),
+                      EAPMessage.create(TtlsMessage(str(src_mac), 113, Eap.RESPONSE, 0, b'')),
+                      State.create(bytes.fromhex("f51d90b0f76c85835ed4ac882e522748")),
+                      MessageAuthenticator.create(bytes.fromhex("00000000000000000000000000000000"))
+                      ]
 
-        eap_message = TtlsMessage(src_mac, 113, Eap.RESPONSE, 0, b'')
-
-        packed_radius = MessagePacker.radius_pack(eap_message, src_mac, username, radius_packet_id,
-                                                  request_authenticator, state, secret,
-                                                  extra_attributes=extra_attributes)
-
-        self.assertEqual(packed_message, packed_radius)
+        packed_radius = MessagePacker.radius_pack(radius_packet_id, request_authenticator, secret,
+                                                  attributes=attributes)
+        self.assertEqual(packed_message, bytes(packed_radius))
 
     def test_radius_packs_with_nas_port(self):
 
         packed_message = bytes.fromhex("01bf00610123456789abcdeffedcba9876543210010a62656e62757274741f1361613a62623a63633a64643a65653a66660506000002a14f18021500160410824788d693e2adac6ce15641418228cf50121139bd192c46fe6d2a937d9573311b70")  # pylint: disable=line-too-long
 
         src_mac = MacAddress.from_string("aa:bb:cc:dd:ee:ff")
-        username = "benburtt"
         radius_packet_id = 191
         request_authenticator = bytes.fromhex("0123456789abcdeffedcba9876543210")
-        state = None
         secret = "SUPERSECRET"
         challenge = bytes.fromhex("824788d693e2adac6ce15641418228cf")
-        eap_message = Md5ChallengeMessage(src_mac, 21, Eap.RESPONSE, challenge, b'')
-        packed_radius = MessagePacker.radius_pack(eap_message, src_mac, username, radius_packet_id,
-                                                  request_authenticator, state, secret,
-                                                  nas_port=0x02a1)
-        self.assertEqual(packed_message, packed_radius)
+
+        attributes = [UserName.create("benburtt"),
+                      CallingStationId.create(str(src_mac)),
+                      NASPort.create(0x02a1),
+                      EAPMessage.create(Md5ChallengeMessage(src_mac, 21, Eap.RESPONSE, challenge, b'')),
+                      MessageAuthenticator.create(bytes.fromhex("00000000000000000000000000000000"))
+                      ]
+
+        packed_radius = MessagePacker.radius_pack(radius_packet_id, request_authenticator, secret,
+                                                  attributes=attributes)
+        self.assertEqual(packed_message, bytes(packed_radius))
+
 
     def test_radius_packs_basic(self):
         """without extra_attributes or nas-port"""
@@ -292,16 +296,19 @@ class MessageParserTestCase(unittest.TestCase):
         packed_message = bytes.fromhex("01bf005b0123456789abcdeffedcba9876543210010a62656e62757274741f1361613a62623a63633a64643a65653a66664f18021500160410824788d693e2adac6ce15641418228cf5012caadc1c7a3be07fe63fdf83a59ed18c2")  # pylint: disable=line-too-long
 
         src_mac = MacAddress.from_string("aa:bb:cc:dd:ee:ff")
-        username = "benburtt"
         radius_packet_id = 191
         request_authenticator = bytes.fromhex("0123456789abcdeffedcba9876543210")
-        state = None
         secret = "SUPERSECRET"
         challenge = bytes.fromhex("824788d693e2adac6ce15641418228cf")
-        eap_message = Md5ChallengeMessage(src_mac, 21, Eap.RESPONSE, challenge, b'')
-        packed_radius = MessagePacker.radius_pack(eap_message, src_mac, username, radius_packet_id,
-                                                  request_authenticator, state, secret)
-        self.assertEqual(packed_message, packed_radius)
+        attributes = [UserName.create("benburtt"),
+                      CallingStationId.create(str(src_mac)),
+                      EAPMessage.create(Md5ChallengeMessage(src_mac, 21, Eap.RESPONSE, challenge, b'')),
+                      MessageAuthenticator.create(bytes.fromhex("00000000000000000000000000000000"))
+                      ]
+
+        packed_radius = MessagePacker.radius_pack(radius_packet_id, request_authenticator, secret,
+                                                  attributes=attributes)
+        self.assertEqual(packed_message, bytes(packed_radius))
 
     def test_unicode_decode_error_converts_to_message_parse_error(self):  # pylint: disable=invalid-name
         data = bytes.fromhex("0163bf130103bf1301")
