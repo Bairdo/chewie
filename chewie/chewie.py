@@ -355,7 +355,7 @@ class Chewie:
             self.state_machines[port_id_str] = {}
         state_machine = self.state_machines[port_id_str].get(src_mac_str, None)
         if not state_machine:
-            log_prefix = "%s.SM - port: %s, client: %s" % (self.logger.name, src_mac, port_id_str)
+            log_prefix = "%s.SM - port: %s, client: %s" % (self.logger.name, port_id_str, src_mac)
             state_machine = FullEAPStateMachine(self.eap_output_messages,
                                                 self.radius_output_messages, src_mac,
                                                 self.timer_scheduler, self.auth_success,
